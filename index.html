@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Résultats du Bac</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  input, select { margin: 5px; padding: 5px; font-size: 1em; }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  th { background-color: #f0f0f0; cursor: pointer; }
+  tr:nth-child(even) { background-color: #fafafa; }
+  #count { margin-top: 10px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Résultats du Bac</h1>
+
+<label for="filterNom">Filtrer par nom (≥ 1 caractère) :</label>
+<input type="text" id="filterNom" placeholder="Ex: MAH" />
+
+<label for="filterPrenom">Filtrer par prénom (≥ 1 caractère) :</label>
+<input type="text" id="filterPrenom" placeholder="Ex: Linda" />
+
+<label for="sortSelect">Trier par :</label>
+<select id="sortSelect">
+  <option value="mention">Mention</option>
+  <option value="nom">Nom</option>
+  <option value="prenoms">Prénom</option>
+</select>
+
+<div id="count"></div>
+
+<table id="resultsTable">
+  <thead>
+    <tr>
+      <th>Nom</th>
+      <th>Prénom(s)</th>
+      <th>Résultat</th>
+      <th>Homonyme</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+// Ordre des mentions pour tri (plus haut en premier)
+const mentionsOrder = [
+  "Admis Mention Très Bien avec les félicitations du jury",
+  "Admis Mention Très Bien",
+  "Admis Mention Bien",
+  "Admis Mention Assez Bien",
+  "Admis",
+  "Passe le second groupe",
+  "Ajourné"
+];
+
+let allResults = []; // tableau plat avec tous les résultats
+
+async function loadResults() {
+  try {
+    const response = await fetch('resultats.json');
+    const data = await response.json();
+    allResults = [];
+
+    // data a la forme { "MAHR": [...], "MAHS": [...], ... }
+    for (const key in data) {
+      if (Array.isArray(data[key])) {
+        allResults.push(...data[key]);
+      }
+    }
+    updateDisplay();
+  } catch (e) {
+    alert("Erreur chargement resultats.json : " + e.message);
+  }
+}
+
+function mentionRank(mention) {
+  const idx = mentionsOrder.findIndex(m => mention.startsWith(m));
+  return idx === -1 ? mentionsOrder.length : idx;
+}
+
+function updateDisplay() {
+  const filterNom = document.getElementById("filterNom").value.trim().toLowerCase();
+  const filterPrenom = document.getElementById("filterPrenom").value.trim().toLowerCase();
+  const sortBy = document.getElementById("sortSelect").value;
+  const tbody = document.querySelector("#resultsTable tbody");
+
+  let filtered = allResults.filter(item => {
+    const nom = item.nom.toLowerCase();
+    const prenoms = item.prenoms.toLowerCase();
+    if (filterNom.length > 0 && !nom.includes(filterNom)) return false;
+    if (filterPrenom.length > 0 && !prenoms.includes(filterPrenom)) return false;
+    return true;
+  });
+
+  filtered.sort((a,b) => {
+    if (sortBy === "mention") {
+      return mentionRank(a.resultat) - mentionRank(b.resultat);
+    } else if (sortBy === "nom") {
+      return a.nom.localeCompare(b.nom);
+    } else if (sortBy === "prenoms") {
+      return a.prenoms.localeCompare(b.prenoms);
+    }
+    return 0;
+  });
+
+  tbody.innerHTML = "";
+  for (const r of filtered) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.nom}</td>
+      <td>${r.prenoms}</td>
+      <td>${r.resultat}</td>
+      <td>${r.homonyme ? "Oui" : "Non"}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById("count").textContent = `Nombre de résultats affichés : ${filtered.length}`;
+}
+
+// Événements pour mise à jour en direct
+document.getElementById("filterNom").addEventListener("input", updateDisplay);
+document.getElementById("filterPrenom").addEventListener("input", updateDisplay);
+document.getElementById("sortSelect").addEventListener("change", updateDisplay);
+
+// Chargement initial
+loadResults();
+</script>
+
+</body>
+</html>
